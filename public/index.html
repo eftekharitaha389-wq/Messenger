@@ -3,14 +3,15 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>پیام‌رسان خصوصی</title>
+  <title>دوستیابی</title>
   <link rel="stylesheet" href="style.css" />
   <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
   <div id="auth-page" class="page">
     <div class="auth-box">
-      <h1>پیام‌رسان خصوصی</h1>
+      <h1>دوستیابی</h1>
+      <p class="subtitle">آشنایی و چت خصوصی</p>
       <div class="tabs">
         <button id="tab-login" class="active">ورود</button>
         <button id="tab-register">ثبت‌نام</button>
@@ -21,13 +22,13 @@
         <button type="submit">ورود</button>
       </form>
       <form id="register-form" class="hidden">
-        <input type="text" id="reg-name" placeholder="نام نمایشی" required />
+        <input type="text" id="reg-name" placeholder="نام نمایشی (برای بقیه)" required />
         <input type="text" id="reg-phone" placeholder="شماره موبایل" required />
         <input type="password" id="reg-password" placeholder="رمز عبور" required />
         <button type="submit">ثبت‌نام</button>
       </form>
       <p id="auth-error" class="error"></p>
-      <p class="hint">سازنده:طاها <b></b>پشتیبانی نداریم😂😂 </b> ثبت‌نام کنید</p>
+      <p class="hint">شماره شما فقط برای مالک برنامه قابل مشاهده است</p>
     </div>
   </div>
 
@@ -43,26 +44,33 @@
           <button id="btn-logout" title="خروج">خروج</button>
         </div>
       </div>
-      <div class="search-box">
-        <input type="text" id="search-user" placeholder="جستجوی کاربر برای شروع چت..." />
-        <div id="user-list" class="user-list"></div>
+
+      <!-- لیست همه افراد (مثل دوستیابی) -->
+      <div class="people-section">
+        <div class="section-title">افراد آنلاین / همه</div>
+        <div class="search-box">
+          <input type="text" id="search-user" placeholder="جستجو بر اساس نام..." />
+        </div>
+        <div id="people-list" class="people-list"></div>
       </div>
+
+      <div class="section-title">گفتگوهای من</div>
       <div class="chat-list" id="chat-list"></div>
     </aside>
     <main class="chat-area">
       <div id="no-chat" class="no-chat">
-        <p>یک گفتگو انتخاب کنید یا کاربر جدیدی پیدا کنید</p>
+        <p>یک نفر را از لیست افراد انتخاب کنید تا چت شروع شود</p>
       </div>
       <div id="active-chat" class="hidden">
         <div class="chat-header">
           <strong id="chat-with-name"></strong>
-          <small id="chat-with-phone"></small>
+          <small id="chat-with-phone" class="hidden"></small>
         </div>
         <div class="messages" id="messages"></div>
         <div class="input-area">
-          <label class="file-btn" title="ارسال فایل یا ویس">
+          <label class="file-btn" title="ارسال عکس، ویدیو، ویس یا آهنگ">
             📎
-            <input type="file" id="file-input" accept="*/*" hidden />
+            <input type="file" id="file-input" accept="image/*,video/*,audio/*,*/*" hidden />
           </label>
           <input type="text" id="message-input" placeholder="پیام خود را بنویسید..." autocomplete="off" />
           <button id="btn-send">ارسال</button>
@@ -73,7 +81,7 @@
 
   <div id="admin-page" class="page hidden">
     <div class="admin-header">
-      <h2>پنل ادمین – همه گفتگوها</h2>
+      <h2>پنل ادمین – همه گفتگوها و شماره‌ها</h2>
       <button id="btn-back-chat">بازگشت به چت</button>
     </div>
     <div id="admin-chats" class="admin-chats"></div>

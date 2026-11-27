@@ -92,8 +92,8 @@ function startApp() {
   }
 
   connectSocket();
-  loadMyChats();
   loadUsers();
+  loadMyChats();
 }
 
 // ========== سوکت ==========
@@ -112,34 +112,52 @@ function connectSocket() {
   });
 }
 
-// ========== لیست کاربران ==========
+// ========== لیست افراد (همه پروفایل‌ها - بدون شماره برای کاربران عادی) ==========
 async function loadUsers() {
   const res = await fetch(API + '/api/users', {
     headers: { Authorization: 'Bearer ' + token }
   });
   allUsers = await res.json();
+  renderPeopleList(allUsers);
+}
+
+function renderPeopleList(list) {
+  const el = document.getElementById('people-list');
+  if (!list.length) {
+    el.innerHTML = '<div class="empty-people">هنوز کسی ثبت‌نام نکرده</div>';
+    return;
+  }
+  el.innerHTML = list.map(u => {
+    const phonePart = (currentUser.isAdmin && u.phone) ? `<small class="phone-only-admin">${u.phone}</small>` : '';
+    return `
+      <div class="person-item" data-id="${u.id}" data-name="${u.name}" data-phone="${u.phone || ''}">
+        <div class="avatar">${u.name.charAt(0)}</div>
+        <div class="person-info">
+          <strong>${escapeHtml(u.name)}</strong>
+          ${phonePart}
+        </div>
+      </div>`;
+  }).join('');
 }
 
 const searchInput = document.getElementById('search-user');
-const userListEl = document.getElementById('user-list');
-
 searchInput.oninput = () => {
   const q = searchInput.value.trim().toLowerCase();
   if (!q) {
-    userListEl.style.display = 'none';
+    renderPeopleList(allUsers);
     return;
   }
-  const filtered = allUsers.filter(u =>
-    u.name.toLowerCase().includes(q) || u.phone.includes(q)
-  );
-  userListEl.innerHTML = filtered.map(u =>
-    `<div data-id="${u.id}" data-name="${u.name}" data-phone="${u.phone}">${u.name} (${u.phone})</div>`
-  ).join('');
-  userListEl.style.display = filtered.length ? 'block' : 'none';
+  // فقط بر اساس نام جستجو (شماره فقط ادمین می‌بیند و جستجو می‌کند)
+  const filtered = allUsers.filter(u => {
+    const nameMatch = u.name.toLowerCase().includes(q);
+    const phoneMatch = currentUser.isAdmin && u.phone && u.phone.includes(q);
+    return nameMatch || phoneMatch;
+  });
+  renderPeopleList(filtered);
 };
 
-userListEl.onclick = async (e) => {
-  const div = e.target.closest('div[data-id]');
+document.getElementById('people-list').onclick = async (e) => {
+  const div = e.target.closest('.person-item');
   if (!div) return;
   const otherId = div.dataset.id;
   const res = await fetch(API + '/api/chat', {
@@ -152,8 +170,6 @@ userListEl.onclick = async (e) => {
   });
   const chat = await res.json();
   openChat(chat.id, { id: otherId, name: div.dataset.name, phone: div.dataset.phone });
-  searchInput.value = '';
-  userListEl.style.display = 'none';
   loadMyChats();
 };
 
@@ -166,13 +182,18 @@ async function loadMyChats() {
   const el = document.getElementById('chat-list');
   el.innerHTML = list.map(c => {
     const last = c.lastMessage;
-    const preview = last
-      ? (last.type === 'text' ? last.content : (last.type === 'voice' ? '🎤 ویس' : '📎 فایل'))
-      : 'شروع گفتگو';
+    let preview = 'شروع گفتگو';
+    if (last) {
+      if (last.type === 'text') preview = last.content;
+      else if (last.type === 'voice') preview = '🎤 ویس';
+      else if (last.type === 'image') preview = '🖼️ عکس';
+      else if (last.type === 'video') preview = '🎬 ویدیو';
+      else preview = '📎 فایل';
+    }
     return `
-      <div class="chat-item ${c.chatId === currentChatId ? 'active' : ''}" data-chat="${c.chatId}" data-name="${c.otherUser?.name}" data-phone="${c.otherUser?.phone}">
-        <strong>${c.otherUser?.name || 'ناشناس'}</strong>
-        <small>${preview}</small>
+      <div class="chat-item ${c.chatId === currentChatId ? 'active' : ''}" data-chat="${c.chatId}" data-name="${c.otherUser?.name || ''}" data-phone="${c.otherUser?.phone || ''}">
+        <strong>${escapeHtml(c.otherUser?.name || 'ناشناس')}</strong>
+        <small>${escapeHtml(preview)}</small>
       </div>`;
   }).join('');
 }
@@ -192,7 +213,16 @@ async function openChat(chatId, otherUser) {
   document.getElementById('no-chat').classList.add('hidden');
   document.getElementById('active-chat').classList.remove('hidden');
   document.getElementById('chat-with-name').textContent = otherUser.name || '';
-  document.getElementById('chat-with-phone').textContent = otherUser.phone || '';
+  
+  // شماره فقط برای ادمین نمایش داده شود
+  const phoneEl = document.getElementById('chat-with-phone');
+  if (currentUser.isAdmin && otherUser.phone) {
+    phoneEl.textContent = otherUser.phone;
+    phoneEl.classList.remove('hidden');
+  } else {
+    phoneEl.textContent = '';
+    phoneEl.classList.add('hidden');
+  }
 
   // هایلایت
   document.querySelectorAll('.chat-item').forEach(el => {
@@ -219,14 +249,21 @@ function appendMessage(msg) {
   let content = '';
   if (msg.type === 'text') {
     content = escapeHtml(msg.content);
-  } else if (msg.type === 'voice' || msg.type === 'file') {
-    content = `<a href="${msg.content}" target="_blank">${msg.type === 'voice' ? '🎤 پخش ویس' : '📎 دانلود فایل'} (${msg.fileName || ''})</a>`;
+  } else if (msg.type === 'image') {
+    content = `<img src="${msg.content}" alt="عکس" class="msg-media" onclick="window.open('${msg.content}','_blank')" />`;
+  } else if (msg.type === 'video') {
+    content = `<video src="${msg.content}" controls class="msg-media"></video>`;
+  } else if (msg.type === 'voice') {
+    content = `<audio src="${msg.content}" controls></audio><br><small>🎤 ${escapeHtml(msg.fileName || 'ویس')}</small>`;
+  } else {
+    content = `<a href="${msg.content}" target="_blank">📎 دانلود فایل (${escapeHtml(msg.fileName || '')})</a>`;
   }
   div.innerHTML = content + `<span class="time">${new Date(msg.time).toLocaleTimeString('fa-IR')}</span>`;
   document.getElementById('messages').appendChild(div);
 }
 
 function escapeHtml(text) {
+  if (!text) return '';
   const d = document.createElement('div');
   d.textContent = text;
   return d.innerHTML;
@@ -255,7 +292,7 @@ function sendText() {
   input.value = '';
 }
 
-// ========== ارسال فایل / ویس ==========
+// ========== ارسال فایل / ویس / عکس / ویدیو ==========
 document.getElementById('file-input').onchange = async (e) => {
   const file = e.target.files[0];
   if (!file || !currentChatId) return;
@@ -298,16 +335,23 @@ document.getElementById('btn-admin').onclick = async () => {
   const container = document.getElementById('admin-chats');
   container.innerHTML = data.map(c => `
     <div class="admin-chat-card">
-      <h3>${c.user1?.name || '?'} ↔ ${c.user2?.name || '?'}</h3>
-      <small>${c.user1?.phone} — ${c.user2?.phone}</small>
-      <div style="margin-top:12px;max-height:200px;overflow-y:auto">
-        ${c.messages.map(m => `
-          <div class="admin-msg">
-            <span class="from">${m.fromName}:</span>
-            ${m.type === 'text' ? escapeHtml(m.content) : (m.type === 'voice' ? '🎤 ویس' : '📎 فایل')}
-            <small style="opacity:0.6"> ${new Date(m.time).toLocaleString('fa-IR')}</small>
-          </div>
-        `).join('') || '<p style="color:#71717a">هنوز پیامی نیست</p>'}
+      <h3>${escapeHtml(c.user1?.name || '?')} ↔ ${escapeHtml(c.user2?.name || '?')}</h3>
+      <small class="admin-phones">${c.user1?.phone || ''} — ${c.user2?.phone || ''}</small>
+      <div style="margin-top:12px;max-height:220px;overflow-y:auto">
+        ${c.messages.map(m => {
+          let body = '';
+          if (m.type === 'text') body = escapeHtml(m.content);
+          else if (m.type === 'voice') body = '🎤 ویس';
+          else if (m.type === 'image') body = '🖼️ عکس';
+          else if (m.type === 'video') body = '🎬 ویدیو';
+          else body = '📎 فایل';
+          return `
+            <div class="admin-msg">
+              <span class="from">${escapeHtml(m.fromName)}:</span>
+              ${body}
+              <small style="opacity:0.6"> ${new Date(m.time).toLocaleString('fa-IR')}</small>
+            </div>`;
+        }).join('') || '<p style="color:#71717a">هنوز پیامی نیست</p>'}
       </div>
     </div>
   `).join('') || '<p>هیچ گفتگویی وجود ندارد</p>';

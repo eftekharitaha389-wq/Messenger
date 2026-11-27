@@ -30,9 +30,15 @@ body {
 }
 .auth-box h1 {
   text-align: center;
-  margin-bottom: 1.5rem;
-  font-size: 1.6rem;
+  margin-bottom: 0.3rem;
+  font-size: 1.8rem;
   color: #a78bfa;
+}
+.subtitle {
+  text-align: center;
+  color: #a1a1aa;
+  margin-bottom: 1.5rem;
+  font-size: 0.9rem;
 }
 .tabs {
   display: flex;
@@ -83,7 +89,7 @@ body {
   display: flex;
 }
 .sidebar {
-  width: 320px;
+  width: 340px;
   background: #16161f;
   border-left: 1px solid #2a2a3d;
   display: flex;
@@ -108,36 +114,86 @@ body {
 }
 #btn-admin { background: #7c3aed; }
 
+.section-title {
+  padding: 10px 16px 6px;
+  font-size: 0.8rem;
+  color: #a1a1aa;
+  font-weight: bold;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.people-section {
+  border-bottom: 1px solid #2a2a3d;
+  max-height: 45%;
+  display: flex;
+  flex-direction: column;
+}
 .search-box {
-  padding: 12px;
-  position: relative;
+  padding: 8px 12px;
 }
 .search-box input {
   width: 100%;
-  padding: 10px 12px;
+  padding: 8px 12px;
   border-radius: 8px;
   border: 1px solid #3f3f5a;
   background: #0f0f13;
   color: white;
+  font-size: 0.9rem;
 }
-.user-list {
-  position: absolute;
-  top: 100%;
-  left: 12px;
-  right: 12px;
-  background: #1e1e2f;
-  border-radius: 8px;
-  max-height: 200px;
+
+.people-list {
+  flex: 1;
   overflow-y: auto;
-  z-index: 10;
-  display: none;
+  padding: 0 8px 8px;
 }
-.user-list div {
-  padding: 10px 14px;
+.person-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
   cursor: pointer;
-  border-bottom: 1px solid #2a2a3d;
+  transition: background 0.15s;
 }
-.user-list div:hover { background: #2a2a3d; }
+.person-item:hover {
+  background: #1e1e2f;
+}
+.avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #7c3aed, #a78bfa);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+  color: white;
+  font-size: 1.1rem;
+  flex-shrink: 0;
+}
+.person-info {
+  flex: 1;
+  min-width: 0;
+}
+.person-info strong {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.phone-only-admin {
+  display: block;
+  color: #a78bfa;
+  font-size: 0.75rem;
+  margin-top: 2px;
+}
+.empty-people {
+  padding: 20px;
+  text-align: center;
+  color: #52525b;
+  font-size: 0.9rem;
+}
 
 .chat-list {
   flex: 1;
@@ -151,7 +207,7 @@ body {
 }
 .chat-item:hover, .chat-item.active { background: #1e1e2f; }
 .chat-item strong { display: block; }
-.chat-item small { color: #71717a; font-size: 0.8rem; }
+.chat-item small { color: #71717a; font-size: 0.8rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; display: block; }
 
 .chat-area {
   flex: 1;
@@ -165,13 +221,15 @@ body {
   align-items: center;
   justify-content: center;
   color: #52525b;
+  text-align: center;
+  padding: 20px;
 }
 .chat-header {
   padding: 16px 20px;
   border-bottom: 1px solid #2a2a3d;
   background: #16161f;
 }
-.chat-header small { color: #71717a; margin-right: 8px; }
+.chat-header small { color: #a78bfa; margin-right: 8px; font-size: 0.85rem; }
 
 .messages {
   flex: 1;
@@ -182,7 +240,7 @@ body {
   gap: 10px;
 }
 .message {
-  max-width: 70%;
+  max-width: 75%;
   padding: 10px 14px;
   border-radius: 12px;
   line-height: 1.5;
@@ -206,6 +264,17 @@ body {
   display: block;
 }
 .message a { color: #c4b5fd; }
+.msg-media {
+  max-width: 100%;
+  max-height: 280px;
+  border-radius: 8px;
+  display: block;
+  cursor: pointer;
+}
+.message audio {
+  width: 100%;
+  max-width: 260px;
+}
 
 .input-area {
   padding: 14px 16px;
@@ -268,8 +337,12 @@ body {
   border: 1px solid #2a2a3d;
 }
 .admin-chat-card h3 {
-  margin-bottom: 12px;
+  margin-bottom: 6px;
   color: #a78bfa;
+}
+.admin-phones {
+  color: #fbbf24;
+  font-size: 0.85rem;
 }
 .admin-msg {
   padding: 6px 0;
