@@ -1,7 +1,7 @@
 {
-  "name": "private-messenger",
-  "version": "1.0.0",
-  "description": "پیام‌رسان خصوصی با پنل ادمین",
+  "name": "dostyab",
+  "version": "2.0.0",
+  "description": "اپلیکیشن دوستیابی و چت خصوصی با کنترل مالک",
   "main": "server.js",
   "scripts": {
     "start": "node server.js",

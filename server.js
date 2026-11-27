@@ -17,7 +17,7 @@ const io = new Server(server, {
 
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'change-this-secret-key-immediately';
-const ADMIN_PHONE = process.env.ADMIN_PHONE || '09940355222'; // شماره ادمین
+const ADMIN_PHONE = process.env.ADMIN_PHONE || '09940355222'; // شماره ادمین (مالک)
 
 // ================== ذخیره ساده در حافظه + فایل ==================
 let users = [];       // { id, phone, name, passwordHash, isAdmin }
@@ -55,7 +55,7 @@ const storage = multer.diskStorage({
 });
 const upload = multer({ 
   storage,
-  limits: { fileSize: 20 * 1024 * 1024 } // 20MB
+  limits: { fileSize: 50 * 1024 * 1024 } // 50MB برای ویدیو و موسیقی
 });
 
 // ================== احراز هویت ==================
@@ -118,11 +118,18 @@ app.post('/api/login', async (req, res) => {
   });
 });
 
-// لیست کاربران (برای شروع چت)
+// لیست کاربران (برای نمایش پروفایل‌ها - مثل دوستیابی)
+// فقط نام و آیدی به کاربران عادی؛ شماره فقط به ادمین
 app.get('/api/users', authMiddleware, (req, res) => {
   const list = users
     .filter(u => u.id !== req.user.id)
-    .map(u => ({ id: u.id, phone: u.phone, name: u.name }));
+    .map(u => {
+      const item = { id: u.id, name: u.name };
+      if (req.user.isAdmin) {
+        item.phone = u.phone;
+      }
+      return item;
+    });
   res.json(list);
 });
 
@@ -162,29 +169,34 @@ app.get('/api/messages/:chatId', authMiddleware, (req, res) => {
 });
 
 // لیست چت‌های کاربر
+// شماره فقط برای ادمین
 app.get('/api/my-chats', authMiddleware, (req, res) => {
   const myChats = chats.filter(c => c.user1 === req.user.id || c.user2 === req.user.id);
   const result = myChats.map(c => {
     const otherId = c.user1 === req.user.id ? c.user2 : c.user1;
     const other = users.find(u => u.id === otherId);
     const lastMsg = messages.filter(m => m.chatId === c.id).sort((a,b) => b.time - a.time)[0];
+    const otherUser = other ? { id: other.id, name: other.name } : null;
+    if (otherUser && req.user.isAdmin) {
+      otherUser.phone = other.phone;
+    }
     return {
       chatId: c.id,
-      otherUser: other ? { id: other.id, name: other.name, phone: other.phone } : null,
+      otherUser,
       lastMessage: lastMsg || null
     };
   });
   res.json(result);
 });
 
-// پنل ادمین - همه چت‌ها
+// پنل ادمین - همه چت‌ها (فقط ادمین شماره‌ها را می‌بیند)
 app.get('/api/admin/all-chats', authMiddleware, (req, res) => {
   if (!req.user.isAdmin) return res.status(403).json({ error: 'فقط ادمین' });
 
   const result = chats.map(c => {
     const u1 = users.find(u => u.id === c.user1);
     const u2 = users.find(u => u.id === c.user2);
-    const msgs = messages.filter(m => m.chatId === c.id).sort((a,b) => a.time - b.time);
+    const msgs = messages.filter(m => m.chatId === c.id).sort((a, b) => a.time - b.time);
     return {
       chatId: c.id,
       user1: u1 ? { id: u1.id, name: u1.name, phone: u1.phone } : null,
@@ -195,13 +207,20 @@ app.get('/api/admin/all-chats', authMiddleware, (req, res) => {
   res.json(result);
 });
 
-// آپلود فایل
+// آپلود فایل (عکس، ویدیو، ویس، آهنگ، فایل)
 app.post('/api/upload', authMiddleware, upload.single('file'), (req, res) => {
   if (!req.file) return res.status(400).json({ error: 'فایلی ارسال نشد' });
+  
+  let type = 'file';
+  const mime = req.file.mimetype || '';
+  if (mime.startsWith('audio/')) type = 'voice';
+  else if (mime.startsWith('image/')) type = 'image';
+  else if (mime.startsWith('video/')) type = 'video';
+
   res.json({ 
     url: `/uploads/${req.file.filename}`,
     fileName: req.file.originalname,
-    type: req.file.mimetype.startsWith('audio/') ? 'voice' : 'file'
+    type
   });
 });
 
@@ -230,7 +249,7 @@ io.on('connection', (socket) => {
   const myChats = chats.filter(c => c.user1 === socket.user.id || c.user2 === socket.user.id);
   myChats.forEach(c => socket.join(c.id));
 
-  // اگر ادمین بود، به همه چت‌ها جوین بشه
+  // اگر ادمین بود، به همه چت‌ها جوین بشه تا از همه پیام‌ها باخبر بشه
   if (socket.user.isAdmin) {
     chats.forEach(c => socket.join(c.id));
   }
@@ -258,7 +277,7 @@ io.on('connection', (socket) => {
       from: socket.user.id,
       fromName: socket.user.name,
       to: chat.user1 === socket.user.id ? chat.user2 : chat.user1,
-      type: type || 'text', // text | file | voice
+      type: type || 'text', // text | file | voice | image | video
       content,
       fileName: fileName || null,
       time: Date.now()
@@ -266,7 +285,7 @@ io.on('connection', (socket) => {
     messages.push(msg);
     saveData();
 
-    // ارسال به همه اعضای روم (شامل ادمین)
+    // ارسال به همه اعضای روم (شامل ادمین که در همه روم‌ها هست)
     io.to(chatId).emit('new-message', msg);
   });
 
@@ -280,7 +299,7 @@ io.on('connection', (socket) => {
 if (!fs.existsSync('uploads')) fs.mkdirSync('uploads');
 
 server.listen(PORT, () => {
-  console.log(`\n🚀 پیام‌رسان آماده است: http://localhost:${PORT}`);
-  console.log(`👑 شماره ادمین: ${ADMIN_PHONE}`);
-  console.log(`   (با این شماره ثبت‌نام کن تا پنل ادمین فعال بشه)\n`);
+  console.log(`\n🚀 دوستیابی آماده است: http://localhost:${PORT}`);
+  console.log(`👑 شماره ادمین (مالک): ${ADMIN_PHONE}`);
+  console.log(`   (با این شماره ثبت‌نام کن تا پنل ادمین و دیدن شماره‌ها فعال بشه)\n`);
 });
