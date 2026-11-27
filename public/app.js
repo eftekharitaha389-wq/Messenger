@@ -93,7 +93,9 @@ function startApp() {
 }
 
 function connectSocket() {
-  socket = io({ auth: { token } });
+  socket = io({
+    auth: { token }
+  });
 
   socket.on('connect', () => console.log('متصل شد'));
   
@@ -105,13 +107,12 @@ function connectSocket() {
     loadMyChats();
   });
 
-  // آپدیت آنلاین/آفلاین
   socket.on('user-status', (data) => {
     const user = allUsers.find(u => u.id === data.userId);
     if (user) {
       user.isOnline = data.isOnline;
-      renderUserList();
-      loadMyChats(); // برای آپدیت وضعیت در لیست چت‌ها
+      renderMembersList();
+      loadMyChats();
     }
   });
 }
@@ -121,13 +122,56 @@ async function loadUsers() {
     headers: { Authorization: 'Bearer ' + token }
   });
   allUsers = await res.json();
-  renderUserList();
+  renderMembersList();
 }
 
-function renderUserList() {
-  const el = document.getElementById('user-list');
-  // این بخش برای جستجو استفاده می‌شه، لیست اصلی پایین‌تره
+function renderMembersList() {
+  const el = document.getElementById('members-list');
+  if (!el) return;
+
+  if (allUsers.length === 0) {
+    el.innerHTML = '<div style="padding:16px;color:#71717a;font-size:0.9rem;">هنوز کسی عضو نشده</div>';
+    return;
+  }
+
+  el.innerHTML = allUsers.map(u => {
+    const status = u.isOnline ? '🟢' : '⚫';
+    const phoneText = (currentUser.isAdmin && u.phone) ? u.phone : '';
+    
+    return `
+      <div class="member-item" data-id="\( {u.id}" data-name=" \){u.name}" data-phone="${u.phone || ''}">
+        <span class="status">${status}</span>
+        <div class="info">
+          <strong>${u.name}</strong>
+          \( {phoneText ? `<small> \){phoneText}</small>` : ''}
+        </div>
+      </div>
+    `;
+  }).join('');
 }
+
+// کلیک روی لیست همه اعضا
+document.getElementById('members-list').addEventListener('click', async (e) => {
+  const div = e.target.closest('.member-item');
+  if (!div) return;
+
+  const otherId = div.dataset.id;
+  const res = await fetch(API + '/api/chat', {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+      Authorization: 'Bearer ' + token
+    },
+    body: JSON.stringify({ otherUserId: otherId })
+  });
+  const chat = await res.json();
+  openChat(chat.id, { 
+    id: otherId, 
+    name: div.dataset.name, 
+    phone: div.dataset.phone 
+  });
+  loadMyChats();
+});
 
 const searchInput = document.getElementById('search-user');
 const userListEl = document.getElementById('user-list');
