@@ -8,7 +8,6 @@
   <script src="/socket.io/socket.io.js"></script>
 </head>
 <body>
-  <!-- صفحه ورود / ثبت‌نام -->
   <div id="auth-page" class="page">
     <div class="auth-box">
       <h1>پیام‌رسان خصوصی</h1>
@@ -16,26 +15,22 @@
         <button id="tab-login" class="active">ورود</button>
         <button id="tab-register">ثبت‌نام</button>
       </div>
-
       <form id="login-form">
         <input type="text" id="login-phone" placeholder="شماره موبایل (مثال: 0912...)" required />
         <input type="password" id="login-password" placeholder="رمز عبور" required />
         <button type="submit">ورود</button>
       </form>
-
       <form id="register-form" class="hidden">
         <input type="text" id="reg-name" placeholder="نام نمایشی" required />
         <input type="text" id="reg-phone" placeholder="شماره موبایل" required />
         <input type="password" id="reg-password" placeholder="رمز عبور" required />
         <button type="submit">ثبت‌نام</button>
       </form>
-
       <p id="auth-error" class="error"></p>
       <p class="hint">برای دسترسی ادمین با شماره <b>09940355222</b> ثبت‌نام کنید</p>
     </div>
   </div>
 
-  <!-- صفحه اصلی چت -->
   <div id="chat-page" class="page hidden">
     <aside class="sidebar">
       <div class="sidebar-header">
@@ -48,36 +43,22 @@
           <button id="btn-logout" title="خروج">خروج</button>
         </div>
       </div>
-
       <div class="search-box">
-        <input type="text" id="search-user" placeholder="جستجوی کاربر..." />
+        <input type="text" id="search-user" placeholder="جستجوی کاربر برای شروع چت..." />
         <div id="user-list" class="user-list"></div>
       </div>
-
-      <div class="section-title">همه اعضا</div>
-      <div class="members-list" id="members-list">
-        <!-- همه کاربران اینجا نمایش داده می‌شوند -->
-      </div>
-
-      <div class="section-title">گفتگوهای من</div>
-      <div class="chat-list" id="chat-list">
-        <!-- لیست چت‌ها اینجا میاد -->
-      </div>
+      <div class="chat-list" id="chat-list"></div>
     </aside>
-
     <main class="chat-area">
       <div id="no-chat" class="no-chat">
-        <p>یک گفتگو انتخاب کنید یا از لیست اعضا کسی را انتخاب کنید</p>
+        <p>یک گفتگو انتخاب کنید یا کاربر جدیدی پیدا کنید</p>
       </div>
-
       <div id="active-chat" class="hidden">
         <div class="chat-header">
           <strong id="chat-with-name"></strong>
           <small id="chat-with-phone"></small>
         </div>
-
         <div class="messages" id="messages"></div>
-
         <div class="input-area">
           <label class="file-btn" title="ارسال فایل یا ویس">
             📎
@@ -90,7 +71,6 @@
     </main>
   </div>
 
-  <!-- پنل ادمین -->
   <div id="admin-page" class="page hidden">
     <div class="admin-header">
       <h2>پنل ادمین – همه گفتگوها</h2>
@@ -98,7 +78,6 @@
     </div>
     <div id="admin-chats" class="admin-chats"></div>
   </div>
-
   <script src="app.js"></script>
 </body>
 </html>
