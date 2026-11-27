@@ -5,7 +5,6 @@ let socket = null;
 let currentChatId = null;
 let allUsers = [];
 
-// ========== عناصر ==========
 const authPage = document.getElementById('auth-page');
 const chatPage = document.getElementById('chat-page');
 const adminPage = document.getElementById('admin-page');
@@ -15,7 +14,6 @@ const tabLogin = document.getElementById('tab-login');
 const tabRegister = document.getElementById('tab-register');
 const authError = document.getElementById('auth-error');
 
-// ========== تب‌ها ==========
 tabLogin.onclick = () => {
   tabLogin.classList.add('active');
   tabRegister.classList.remove('active');
@@ -31,7 +29,6 @@ tabRegister.onclick = () => {
   authError.textContent = '';
 };
 
-// ========== ورود و ثبت‌نام ==========
 loginForm.onsubmit = async (e) => {
   e.preventDefault();
   const phone = document.getElementById('login-phone').value.trim();
@@ -78,7 +75,6 @@ function saveAuth(data) {
   localStorage.setItem('user', JSON.stringify(currentUser));
 }
 
-// ========== شروع اپ ==========
 function startApp() {
   authPage.classList.add('hidden');
   chatPage.classList.remove('hidden');
@@ -96,28 +92,41 @@ function startApp() {
   loadUsers();
 }
 
-// ========== سوکت ==========
 function connectSocket() {
-  socket = io({
-    auth: { token }
-  });
+  socket = io({ auth: { token } });
 
   socket.on('connect', () => console.log('متصل شد'));
+  
   socket.on('new-message', (msg) => {
     if (msg.chatId === currentChatId) {
       appendMessage(msg);
       scrollToBottom();
     }
-    loadMyChats(); // آپدیت آخرین پیام
+    loadMyChats();
+  });
+
+  // آپدیت آنلاین/آفلاین
+  socket.on('user-status', (data) => {
+    const user = allUsers.find(u => u.id === data.userId);
+    if (user) {
+      user.isOnline = data.isOnline;
+      renderUserList();
+      loadMyChats(); // برای آپدیت وضعیت در لیست چت‌ها
+    }
   });
 }
 
-// ========== لیست کاربران ==========
 async function loadUsers() {
   const res = await fetch(API + '/api/users', {
     headers: { Authorization: 'Bearer ' + token }
   });
   allUsers = await res.json();
+  renderUserList();
+}
+
+function renderUserList() {
+  const el = document.getElementById('user-list');
+  // این بخش برای جستجو استفاده می‌شه، لیست اصلی پایین‌تره
 }
 
 const searchInput = document.getElementById('search-user');
@@ -130,11 +139,15 @@ searchInput.oninput = () => {
     return;
   }
   const filtered = allUsers.filter(u =>
-    u.name.toLowerCase().includes(q) || u.phone.includes(q)
+    u.name.toLowerCase().includes(q) || (u.phone && u.phone.includes(q))
   );
-  userListEl.innerHTML = filtered.map(u =>
-    `<div data-id="${u.id}" data-name="${u.name}" data-phone="${u.phone}">${u.name} (${u.phone})</div>`
-  ).join('');
+  userListEl.innerHTML = filtered.map(u => {
+    const status = u.isOnline ? '🟢' : '⚫';
+    const phoneText = currentUser.isAdmin && u.phone ? ` (${u.phone})` : '';
+    return `<div data-id="\( {u.id}" data-name=" \){u.name}" data-phone="${u.phone || ''}">
+      ${status} \( {u.name} \){phoneText}
+    </div>`;
+  }).join('');
   userListEl.style.display = filtered.length ? 'block' : 'none';
 };
 
@@ -157,7 +170,6 @@ userListEl.onclick = async (e) => {
   loadMyChats();
 };
 
-// ========== لیست چت‌های من ==========
 async function loadMyChats() {
   const res = await fetch(API + '/api/my-chats', {
     headers: { Authorization: 'Bearer ' + token }
@@ -169,9 +181,13 @@ async function loadMyChats() {
     const preview = last
       ? (last.type === 'text' ? last.content : (last.type === 'voice' ? '🎤 ویس' : '📎 فایل'))
       : 'شروع گفتگو';
+    const status = c.otherUser?.isOnline ? '🟢' : '⚫';
     return `
-      <div class="chat-item ${c.chatId === currentChatId ? 'active' : ''}" data-chat="${c.chatId}" data-name="${c.otherUser?.name}" data-phone="${c.otherUser?.phone}">
-        <strong>${c.otherUser?.name || 'ناشناس'}</strong>
+      <div class="chat-item ${c.chatId === currentChatId ? 'active' : ''}" 
+           data-chat="${c.chatId}" 
+           data-name="${c.otherUser?.name || ''}" 
+           data-phone="${c.otherUser?.phone || ''}">
+        <strong>${status} ${c.otherUser?.name || 'ناشناس'}</strong>
         <small>${preview}</small>
       </div>`;
   }).join('');
@@ -186,23 +202,19 @@ document.getElementById('chat-list').onclick = (e) => {
   });
 };
 
-// ========== باز کردن چت ==========
 async function openChat(chatId, otherUser) {
   currentChatId = chatId;
   document.getElementById('no-chat').classList.add('hidden');
   document.getElementById('active-chat').classList.remove('hidden');
   document.getElementById('chat-with-name').textContent = otherUser.name || '';
-  document.getElementById('chat-with-phone').textContent = otherUser.phone || '';
+  document.getElementById('chat-with-phone').textContent = currentUser.isAdmin ? (otherUser.phone || '') : '';
 
-  // هایلایت
   document.querySelectorAll('.chat-item').forEach(el => {
     el.classList.toggle('active', el.dataset.chat === chatId);
   });
 
-  // عضویت در روم
   socket.emit('join-chat', chatId);
 
-  // بارگذاری پیام‌ها
   const res = await fetch(API + '/api/messages/' + chatId, {
     headers: { Authorization: 'Bearer ' + token }
   });
@@ -219,8 +231,8 @@ function appendMessage(msg) {
   let content = '';
   if (msg.type === 'text') {
     content = escapeHtml(msg.content);
-  } else if (msg.type === 'voice' || msg.type === 'file') {
-    content = `<a href="${msg.content}" target="_blank">${msg.type === 'voice' ? '🎤 پخش ویس' : '📎 دانلود فایل'} (${msg.fileName || ''})</a>`;
+  } else {
+    content = `<a href="\( {msg.content}" target="_blank"> \){msg.type === 'voice' ? '🎤 پخش ویس' : '📎 دانلود فایل'} (${msg.fileName || ''})</a>`;
   }
   div.innerHTML = content + `<span class="time">${new Date(msg.time).toLocaleTimeString('fa-IR')}</span>`;
   document.getElementById('messages').appendChild(div);
@@ -237,7 +249,6 @@ function scrollToBottom() {
   el.scrollTop = el.scrollHeight;
 }
 
-// ========== ارسال پیام ==========
 document.getElementById('btn-send').onclick = sendText;
 document.getElementById('message-input').onkeydown = (e) => {
   if (e.key === 'Enter') sendText();
@@ -255,7 +266,6 @@ function sendText() {
   input.value = '';
 }
 
-// ========== ارسال فایل / ویس ==========
 document.getElementById('file-input').onchange = async (e) => {
   const file = e.target.files[0];
   if (!file || !currentChatId) return;
@@ -280,14 +290,12 @@ document.getElementById('file-input').onchange = async (e) => {
   e.target.value = '';
 };
 
-// ========== خروج ==========
 document.getElementById('btn-logout').onclick = () => {
   localStorage.removeItem('token');
   localStorage.removeItem('user');
   location.reload();
 };
 
-// ========== پنل ادمین ==========
 document.getElementById('btn-admin').onclick = async () => {
   chatPage.classList.add('hidden');
   adminPage.classList.remove('hidden');
@@ -318,7 +326,6 @@ document.getElementById('btn-back-chat').onclick = () => {
   chatPage.classList.remove('hidden');
 };
 
-// ========== شروع ==========
 if (token && currentUser) {
   startApp();
 }
