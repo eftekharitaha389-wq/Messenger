@@ -17,13 +17,14 @@ const io = new Server(server, {
 
 const PORT = process.env.PORT || 3000;
 const JWT_SECRET = process.env.JWT_SECRET || 'change-this-secret-key-immediately';
-const ADMIN_PHONE = process.env.ADMIN_PHONE || '09940355222';
+const ADMIN_PHONE = process.env.ADMIN_PHONE || '09940355222'; // شماره ادمین
 
-let users = [];
-let messages = [];
-let chats = [];
-const onlineUsers = new Map(); // userId -> socketId
+// ================== ذخیره ساده در حافظه + فایل ==================
+let users = [];       // { id, phone, name, passwordHash, isAdmin }
+let messages = [];    // { id, chatId, from, to, type, content, fileName, time }
+let chats = [];       // { id, user1, user2 }
 
+// بارگذاری از فایل اگر وجود داشت
 const DATA_FILE = path.join(__dirname, 'data.json');
 if (fs.existsSync(DATA_FILE)) {
   try {
@@ -38,11 +39,13 @@ function saveData() {
   fs.writeFileSync(DATA_FILE, JSON.stringify({ users, messages, chats }, null, 2));
 }
 
+// ================== میدلورها ==================
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
+// آپلود فایل
 const storage = multer.diskStorage({
   destination: (req, file, cb) => cb(null, 'uploads/'),
   filename: (req, file, cb) => {
@@ -50,8 +53,12 @@ const storage = multer.diskStorage({
     cb(null, unique + path.extname(file.originalname));
   }
 });
-const upload = multer({ storage, limits: { fileSize: 20 * 1024 * 1024 } });
+const upload = multer({ 
+  storage,
+  limits: { fileSize: 20 * 1024 * 1024 } // 20MB
+});
 
+// ================== احراز هویت ==================
 function authMiddleware(req, res, next) {
   const token = req.headers.authorization?.split(' ')[1];
   if (!token) return res.status(401).json({ error: 'وارد شوید' });
@@ -65,11 +72,17 @@ function authMiddleware(req, res, next) {
   }
 }
 
+// ================== API ها ==================
+
 // ثبت‌نام
 app.post('/api/register', async (req, res) => {
   const { phone, name, password } = req.body;
-  if (!phone || !password || !name) return res.status(400).json({ error: 'شماره، نام و رمز لازم است' });
-  if (users.find(u => u.phone === phone)) return res.status(400).json({ error: 'این شماره قبلاً ثبت شده' });
+  if (!phone || !password || !name) {
+    return res.status(400).json({ error: 'شماره، نام و رمز لازم است' });
+  }
+  if (users.find(u => u.phone === phone)) {
+    return res.status(400).json({ error: 'این شماره قبلاً ثبت شده' });
+  }
 
   const hash = await bcrypt.hash(password, 10);
   const user = {
@@ -105,26 +118,15 @@ app.post('/api/login', async (req, res) => {
   });
 });
 
-// لیست کاربران (شماره فقط برای ادمین)
+// لیست کاربران (برای شروع چت)
 app.get('/api/users', authMiddleware, (req, res) => {
   const list = users
     .filter(u => u.id !== req.user.id)
-    .map(u => {
-      const base = {
-        id: u.id,
-        name: u.name,
-        isOnline: onlineUsers.has(u.id)
-      };
-      // فقط ادمین شماره رو می‌بینه
-      if (req.user.isAdmin) {
-        base.phone = u.phone;
-      }
-      return base;
-    });
+    .map(u => ({ id: u.id, phone: u.phone, name: u.name }));
   res.json(list);
 });
 
-// دریافت یا ساخت چت
+// دریافت یا ساخت چت خصوصی
 app.post('/api/chat', authMiddleware, (req, res) => {
   const { otherUserId } = req.body;
   if (!otherUserId) return res.status(400).json({ error: 'کاربر مشخص نشده' });
@@ -147,6 +149,7 @@ app.get('/api/messages/:chatId', authMiddleware, (req, res) => {
   const chat = chats.find(c => c.id === req.params.chatId);
   if (!chat) return res.status(404).json({ error: 'چت یافت نشد' });
 
+  // فقط شرکت‌کنندگان یا ادمین می‌تونن ببینن
   const isParticipant = chat.user1 === req.user.id || chat.user2 === req.user.id;
   if (!isParticipant && !req.user.isAdmin) {
     return res.status(403).json({ error: 'دسترسی ندارید' });
@@ -158,7 +161,7 @@ app.get('/api/messages/:chatId', authMiddleware, (req, res) => {
   res.json(msgs);
 });
 
-// لیست چت‌های من
+// لیست چت‌های کاربر
 app.get('/api/my-chats', authMiddleware, (req, res) => {
   const myChats = chats.filter(c => c.user1 === req.user.id || c.user2 === req.user.id);
   const result = myChats.map(c => {
@@ -167,19 +170,14 @@ app.get('/api/my-chats', authMiddleware, (req, res) => {
     const lastMsg = messages.filter(m => m.chatId === c.id).sort((a,b) => b.time - a.time)[0];
     return {
       chatId: c.id,
-      otherUser: other ? { 
-        id: other.id, 
-        name: other.name, 
-        phone: req.user.isAdmin ? other.phone : undefined,
-        isOnline: onlineUsers.has(other.id)
-      } : null,
+      otherUser: other ? { id: other.id, name: other.name, phone: other.phone } : null,
       lastMessage: lastMsg || null
     };
   });
   res.json(result);
 });
 
-// پنل ادمین
+// پنل ادمین - همه چت‌ها
 app.get('/api/admin/all-chats', authMiddleware, (req, res) => {
   if (!req.user.isAdmin) return res.status(403).json({ error: 'فقط ادمین' });
 
@@ -208,6 +206,8 @@ app.post('/api/upload', authMiddleware, upload.single('file'), (req, res) => {
 });
 
 // ================== Socket.io ==================
+const onlineUsers = new Map(); // userId -> socketId
+
 io.use((socket, next) => {
   const token = socket.handshake.auth.token;
   if (!token) return next(new Error('احراز هویت لازم است'));
@@ -223,16 +223,14 @@ io.use((socket, next) => {
 });
 
 io.on('connection', (socket) => {
-  console.log('وصل شد:', socket.user.name);
+  console.log('کاربر وصل شد:', socket.user.name);
   onlineUsers.set(socket.user.id, socket.id);
 
-  // به همه بگو این کاربر آنلاین شد
-  io.emit('user-status', { userId: socket.user.id, isOnline: true });
-
-  // عضویت در چت‌های خودش
+  // عضویت در روم‌های چت خودش
   const myChats = chats.filter(c => c.user1 === socket.user.id || c.user2 === socket.user.id);
   myChats.forEach(c => socket.join(c.id));
 
+  // اگر ادمین بود، به همه چت‌ها جوین بشه
   if (socket.user.isAdmin) {
     chats.forEach(c => socket.join(c.id));
   }
@@ -260,7 +258,7 @@ io.on('connection', (socket) => {
       from: socket.user.id,
       fromName: socket.user.name,
       to: chat.user1 === socket.user.id ? chat.user2 : chat.user1,
-      type: type || 'text',
+      type: type || 'text', // text | file | voice
       content,
       fileName: fileName || null,
       time: Date.now()
@@ -268,19 +266,21 @@ io.on('connection', (socket) => {
     messages.push(msg);
     saveData();
 
+    // ارسال به همه اعضای روم (شامل ادمین)
     io.to(chatId).emit('new-message', msg);
   });
 
   socket.on('disconnect', () => {
     onlineUsers.delete(socket.user.id);
-    io.emit('user-status', { userId: socket.user.id, isOnline: false });
-    console.log('قطع شد:', socket.user.name);
+    console.log('کاربر قطع شد:', socket.user.name);
   });
 });
 
+// ================== شروع سرور ==================
 if (!fs.existsSync('uploads')) fs.mkdirSync('uploads');
 
 server.listen(PORT, () => {
-  console.log(`پیام‌رسان آماده است روی پورت ${PORT}`);
-  console.log(`شماره ادمین: ${ADMIN_PHONE}`);
+  console.log(`\n🚀 پیام‌رسان آماده است: http://localhost:${PORT}`);
+  console.log(`👑 شماره ادمین: ${ADMIN_PHONE}`);
+  console.log(`   (با این شماره ثبت‌نام کن تا پنل ادمین فعال بشه)\n`);
 });
